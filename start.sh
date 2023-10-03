@@ -11,10 +11,15 @@ WORKLOAD_TYPE="workload$2"
 RECORD_COUNT=$3
 OPERATION_COUNT=$4
 COUNT_FILE="/mnt/io_uring/results/count.txt"
+OUTPUT_DIR=""
+
 SYSCOUNT_PID=""
 CACHESTAT_PID=""
 SAR_PID=""
 SRV_PID=""
+
+PORT="6379"
+HOST="127.0.0.1"
 
 trap "exxit" EXIT
 trap "exxit" SIGTERM
@@ -53,8 +58,8 @@ ${SRV} > ${OUTPUT_DIR}/${SRV}.log &
 SRV_PID=$!
 
 #run ycsb
-$YCSC_SH load redis -s -P ${YCSB_BASE}/workloads/${WORKLOAD_TYPE} -p "redis.host=127.0.0.1" -p "redis.port=6379" >> ${OUTPUT_DIR}/ycsb-out.txt 2>> ${OUTPUT_DIR}/ycsb-err.txt
-$YCSC_SH run redis -s -P ${YCSB_BASE}/workloads/${WORKLOAD_TYPE} -p "redis.host=127.0.0.1" -p "redis.port=6379" >> ${OUTPUT_DIR}/ycsb-out.txt 2>> ${OUTPUT_DIR}/ycsb-err.txt &
+$YCSC_SH load redis -s -P ${YCSB_BASE}/workloads/${WORKLOAD_TYPE} -p "redis.host=${HOST}" -p "redis.port=${PORT}" >> ${OUTPUT_DIR}/ycsb-out.txt 2>> ${OUTPUT_DIR}/ycsb-err.txt
+$YCSC_SH run redis -s -P ${YCSB_BASE}/workloads/${WORKLOAD_TYPE} -p "redis.host=${HOST}" -p "redis.port=${PORT}" >> ${OUTPUT_DIR}/ycsb-out.txt 2>> ${OUTPUT_DIR}/ycsb-err.txt &
 
 #wait for ycsb to setup maven
 sleep 5
