@@ -3,6 +3,7 @@
 # Arguments in order: (r/d) redis or dragonfly, (a/b/c/d/e/f) workload type, (int) record count optional, (int) operation count optional
 # example invocation $ ./start.sh r a 1000000 2000000 # runs redis benchmark with workload a, 1 mil record count and 2 mil op count
 
+
 YCSB_BASE="/mnt/io_uring/YCSB"
 YCSC_SH="${YCSB_BASE}/bin/ycsb.sh"
 WORKLOAD_DIR="${YCSB_BASE}/workloads"
@@ -20,8 +21,16 @@ SRV_PID=""
 
 PORT="6379"
 HOST="127.0.0.1"
+set -x
+function exxit() {
+    kill $SRV_PID
+    kill -2 $SYSCOUNT_PID
+    kill -2 $CACHESTAT_PID
+    kill -2 $SAR_PID
+}
 
-trap "exxit" EXIT
+
+#trap "exxit" EXIT
 trap "exxit" SIGTERM
 
 #maintain how many times the script has run to track
@@ -34,13 +43,14 @@ fi
 echo ${count} > ${COUNT_FILE}
 
 #output dir for storing results of this invocation
-OUTPUT_DIR="/mnt/io_uring/results/${count}-$(date)"
+OUTPUT_DIR="/mnt/io_uring/results/${count}-$(date +%Y%m%d)"
+mkdir $OUTPUT_DIR
 
 #check redis/dragonfly
 if [ "$1" = 'r' ]; then
-    SRV="$(which redis-server)"
+    SRV=`basename $(which redis-server)`
 elif [ "$1" = 'd' ]; then
-    SRV="$(which dragonfly)"
+    SRV=`basename $(which dragonfly)`
 fi
 
 #check if record count and operation count are specified, note that both must be specified
@@ -60,26 +70,21 @@ SRV_PID=$!
 #run ycsb
 $YCSC_SH load redis -s -P ${YCSB_BASE}/workloads/"${WORKLOAD_TYPE}" -p "redis.host=${HOST}" -p "redis.port=${PORT}" >> "${OUTPUT_DIR}"/ycsb-out.txt 2>> "${OUTPUT_DIR}"/ycsb-err.txt
 $YCSC_SH run redis -s -P ${YCSB_BASE}/workloads/"${WORKLOAD_TYPE}" -p "redis.host=${HOST}" -p "redis.port=${PORT}" >> "${OUTPUT_DIR}"/ycsb-out.txt 2>> "${OUTPUT_DIR}"/ycsb-err.txt &
-
+YCSB_PID=$!
 #wait for ycsb to setup maven
-sleep 5
+#sleep 5
 
-syscounts -L -p ${SRV_PID} >> "${OUTPUT_DIR}"/syscounts-out.txt 2>> "${OUTPUT_DIR}"/syscounts-err.txt &
-SYSCOUNT_PID=$!
+#syscount -L -p ${SRV_PID} >> "${OUTPUT_DIR}"/syscount-out.txt 2>> "${OUTPUT_DIR}"/syscount-err.txt &
+#SYSCOUNT_PID=$!
 
 cachestat >> "${OUTPUT_DIR}"/cachestat-out.txt 2>> "${OUTPUT_DIR}"/cachestat-err.txt &
 CACHESTAT_PID=$!
 
-sar -B >> "${OUTPUT_DIR}"/sar-out.txt 2>> "${OUTPUT_DIR}"/sar-err.txt $
+sar -B 1 >> "${OUTPUT_DIR}"/sar-out.txt 2>> "${OUTPUT_DIR}"/sar-err.txt &
 SAR_PID=$!
 
 
-function exxit() {
-    kill $SRV_PID
-    kill $SYSCOUNT_PID
-    kill $CACHESTAT_PID
-    kill $SAR_PID
-}
-
+syscount -L -p ${SRV_PID} >> "${OUTPUT_DIR}"/syscount-out.txt 2>> "${OUTPUT_DIR}"/syscount-err.txt 
+wait $YCSB_PID
 
 
